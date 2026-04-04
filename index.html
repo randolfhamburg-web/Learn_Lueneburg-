@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lüneburg lernen</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:        #0d1117;
+      --card:      #161b22;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --gold:      #f0a500;
+      --green:     #3fb950;
+      --red:       #f85149;
+      --blue:      #58a6ff;
+      --purple:    #bc8cff;
+    }
+
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ─────────────────────────────────── */
+    header {
+      flex-shrink: 0;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      gap: 12px;
+      z-index: 200;
+    }
+
+    .logo {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--gold);
+      white-space: nowrap;
+    }
+
+    .header-center {
+      display: flex;
+      gap: 4px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px;
+    }
+
+    .mode-btn {
+      padding: 4px 14px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .mode-btn.active { background: var(--gold); color: #000; }
+
+    .header-right { display: flex; align-items: center; gap: 10px; }
+
+    .progress-text { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+
+    .score-pill {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.82rem;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .score-pill strong { color: var(--gold); }
+
+    /* ── LAYOUT ──────────────────────────────────── */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── SIDEBAR ─────────────────────────────────── */
+    .sidebar {
+      width: 210px;
+      flex-shrink: 0;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .stabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .stab {
+      flex: 1;
+      padding: 9px 4px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      text-align: center;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .stab.active-street { color: var(--blue); border-bottom-color: var(--blue); }
+    .stab.active-place  { color: var(--purple); border-bottom-color: var(--purple); }
+
+    .label-pool {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .label-pool::-webkit-scrollbar { width: 4px; }
+    .label-pool::-webkit-scrollbar-track { background: transparent; }
+    .label-pool::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .chip {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 10px;
+      border-radius: 7px;
+      font-size: 0.77rem;
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      color: var(--text);
+      cursor: grab;
+      user-select: none;
+      transition: transform 0.12s, border-color 0.12s, background 0.12s;
+    }
+    .chip.street { border-color: rgba(88,166,255,0.35); }
+    .chip.place  { border-color: rgba(188,140,255,0.35); }
+
+    .chip:hover:not(.done) {
+      background: #21262d;
+      border-color: var(--gold);
+      transform: translateX(3px);
+    }
+
+    .chip.done {
+      opacity: 0.35;
+      cursor: default;
+      border-color: rgba(63,185,80,0.35);
+      background: #0a1f11;
+    }
+
+    .chip.dragging { opacity: 0.35; }
+
+    .chip-icon { flex-shrink: 0; font-size: 0.95rem; }
+    .chip-name { flex: 1; line-height: 1.25; }
+    .chip-ok   { color: var(--green); font-size: 0.85rem; }
+
+    /* ── SIDEBAR FOOTER ──────────────────────────── */
+    .sidebar-footer {
+      flex-shrink: 0;
+      padding: 8px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .hint-note {
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 7px;
+      border-radius: 7px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      transition: background 0.15s;
+    }
+    .btn:hover    { background: #21262d; }
+    .btn.gold     { background: var(--gold); color: #000; border-color: var(--gold); }
+    .btn.gold:hover { opacity: 0.85; }
+    .btn.danger   { background: var(--red); color: #fff; border-color: var(--red); }
+    .btn.danger:hover { opacity: 0.85; }
+
+    /* ── MAP ─────────────────────────────────────── */
+    .map-wrap {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #map { width: 100%; height: 100%; }
+
+    .map-wrap.dragging-over { box-shadow: inset 0 0 0 4px rgba(240,165,0,0.55); }
+
+    /* ── LEARN BADGE ─────────────────────────────── */
+    .learn-badge {
+      position: absolute;
+      top: 10px;
+      right: 56px;
+      background: rgba(240,165,0,0.92);
+      color: #000;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      z-index: 600;
+      pointer-events: none;
+      display: none;
+    }
+
+    /* ── TOAST ───────────────────────────────────── */
+    .toast {
+      position: absolute;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 22px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      pointer-events: none;
+      z-index: 1500;
+      white-space: nowrap;
+      transition: transform 0.3s cubic-bezier(0.175,0.885,0.32,1.275);
+    }
+    .toast.show     { transform: translateX(-50%) translateY(0); }
+    .toast.success  { border-color: var(--green); color: var(--green); }
+    .toast.error    { border-color: var(--red);   color: var(--red);   }
+    .toast.info     { border-color: var(--gold);  color: var(--gold);  }
+
+    /* ── PLACED LABEL ON MAP ─────────────────────── */
+    .map-lbl {
+      background: rgba(13,17,23,0.92);
+      border-radius: 5px;
+      padding: 3px 8px;
+      font-size: 0.71rem;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      pointer-events: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      animation: popIn 0.25s ease;
+    }
+    .map-lbl.street { border: 1.5px solid var(--blue);   }
+    .map-lbl.place  { border: 1.5px solid var(--purple); }
+    .map-lbl.learn  { border: 1.5px solid var(--gold); opacity: 0.75; }
+
+    @keyframes popIn {
+      from { transform: scale(0.7); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+
+    /* ── WIN OVERLAY ─────────────────────────────── */
+    .win-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 3000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s;
+    }
+    .win-overlay.show { opacity: 1; pointer-events: all; }
+
+    .win-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 44px 48px;
+      text-align: center;
+      max-width: 380px;
+    }
+    .win-emoji  { font-size: 3rem; margin-bottom: 8px; }
+    .win-title  { font-size: 1.7rem; font-weight: 700; margin-bottom: 6px; }
+    .win-pts    { font-size: 1.3rem; color: var(--gold); margin-bottom: 8px; }
+    .win-sub    { color: var(--muted); font-size: 0.88rem; margin-bottom: 24px; }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ───────────────────────────────────── -->
+<header>
+  <div class="logo">🗺️ Lüneburg lernen</div>
+
+  <div class="header-center">
+    <button class="mode-btn active" id="btn-quiz"  onclick="setMode('quiz')">Quiz</button>
+    <button class="mode-btn"        id="btn-learn" onclick="setMode('learn')">Lernen</button>
+  </div>
+
+  <div class="header-right">
+    <span class="progress-text" id="progress-text">0 / 18 platziert</span>
+    <div class="score-pill">⭐ <strong id="score">0</strong> Pkt.</div>
+  </div>
+</header>
+
+<!-- ── MAIN ─────────────────────────────────────── -->
+<div class="main">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="stabs">
+      <button class="stab active-street" id="stab-streets" onclick="switchTab('streets')">🛣️ Straßen</button>
+      <button class="stab"               id="stab-places"  onclick="switchTab('places')">📍 Orte</button>
+    </div>
+
+    <div class="label-pool" id="label-pool"></div>
+
+    <div class="sidebar-footer">
+      <div class="hint-note">
+        Ziehe einen Namen auf die<br>richtige Stelle der Karte.<br>
+        <em>Tooltip = Hinweis!</em>
+      </div>
+      <button class="btn gold"   onclick="showZones()">💡 Zielzonen anzeigen (8 s)</button>
+      <button class="btn danger" onclick="resetGame()">↺ Neu starten</button>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div class="map-wrap" id="map-wrap">
+    <div id="map"></div>
+    <div class="learn-badge" id="learn-badge">📚 Lernmodus – alle Orte sichtbar</div>
+    <div class="toast"       id="toast"></div>
+
+    <!-- Win overlay -->
+    <div class="win-overlay" id="win-overlay">
+      <div class="win-card">
+        <div class="win-emoji">🏆</div>
+        <div class="win-title">Geschafft!</div>
+        <div class="win-pts"  id="win-pts">180 Punkte</div>
+        <div class="win-sub">Du kennst jetzt alle Straßen und Orte in der Lüneburger Altstadt!</div>
+        <button class="btn gold" onclick="resetGame()">Nochmal spielen</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ═══════════════════════════════════════════════
+//  GAME DATA  (Lüneburg Altstadt)
+// ═══════════════════════════════════════════════
+
+const ITEMS = {
+  streets: [
+    {
+      id: 'am-sande', name: 'Am Sande', icon: '🛣️',
+      lat: 53.2498, lng: 10.4063, tol: 130,
+      hint: 'Großer Platz direkt vor der Johanniskirche – Herz der Altstadt'
+    },
+    {
+      id: 'bei-johanniskirche', name: 'Bei der Johanniskirche', icon: '🛣️',
+      lat: 53.2505, lng: 10.4047, tol: 110,
+      hint: 'Kleine Straße unmittelbar neben dem Kirchenschiff'
+    },
+    {
+      id: 'johannisstr', name: 'Johannisstraße', icon: '🛣️',
+      lat: 53.2518, lng: 10.4053, tol: 140,
+      hint: 'Führt nördlich vom Am Sande in Richtung Innenstadt'
+    },
+    {
+      id: 'bardowicker', name: 'Bardowicker Straße', icon: '🛣️',
+      lat: 53.2512, lng: 10.4037, tol: 130,
+      hint: 'Einfallsstraße von Norden – führt nach Bardowick'
+    },
+    {
+      id: 'auf-dem-meere', name: 'Auf dem Meere', icon: '🛣️',
+      lat: 53.2491, lng: 10.4040, tol: 120,
+      hint: 'Westlich der Johanniskirche, kurze historische Gasse'
+    },
+    {
+      id: 'heiligengeist', name: 'Heiligengeiststraße', icon: '🛣️',
+      lat: 53.2487, lng: 10.4053, tol: 120,
+      hint: 'Nahe dem ehemaligen Heiligengeist-Hospital'
+    },
+    {
+      id: 'grapengiesser', name: 'Grapengießerstraße', icon: '🛣️',
+      lat: 53.2483, lng: 10.4069, tol: 130,
+      hint: 'Historische Straße im östlichen Teil der Altstadt'
+    },
+    {
+      id: 'schroeder', name: 'Schröderstraße', icon: '🛣️',
+      lat: 53.2506, lng: 10.4079, tol: 120,
+      hint: 'Östlich von Am Sande, Richtung Ilmenau'
+    },
+    {
+      id: 'grosse-baecker', name: 'Große Bäckerstraße', icon: '🛣️',
+      lat: 53.2492, lng: 10.4028, tol: 120,
+      hint: 'Verbindet Am Sande mit dem Marktplatz'
+    },
+    {
+      id: 'waage', name: 'Waagestraße', icon: '🛣️',
+      lat: 53.2494, lng: 10.4017, tol: 110,
+      hint: 'Nahe am Rathaus – hier stand einst die Stadtwaage'
+    },
+  ],
+  places: [
+    {
+      id: 'johanniskirche', name: 'St. Johanniskirche', icon: '⛪',
+      lat: 53.2501, lng: 10.4055, tol: 75,
+      hint: 'Älteste der drei Hauptkirchen, berühmt durch ihren schiefen Turm'
+    },
+    {
+      id: 'rathaus', name: 'Rathaus', icon: '🏛️',
+      lat: 53.2491, lng: 10.4014, tol: 75,
+      hint: 'Gotisches Rathaus am historischen Marktplatz'
+    },
+    {
+      id: 'haertchen', name: 'Härtchen', icon: '🍺',
+      lat: 53.2480, lng: 10.4071, tol: 85,
+      hint: 'Beliebte Gaststätte nahe der Ilmenau am Stintmarkt'
+    },
+    {
+      id: 'wasserturm', name: 'Wasserturm', icon: '🗼',
+      lat: 53.2534, lng: 10.4019, tol: 90,
+      hint: 'Markantes Wahrzeichen – gut sichtbar im Norden der Altstadt'
+    },
+    {
+      id: 'stintmarkt', name: 'Stintmarkt', icon: '🐟',
+      lat: 53.2476, lng: 10.4075, tol: 90,
+      hint: 'Historischer Fischmarkt direkt an der Ilmenau'
+    },
+    {
+      id: 'am-berge', name: 'Platz am Berge', icon: '🏙️',
+      lat: 53.2505, lng: 10.4029, tol: 90,
+      hint: 'Dritter großer Stadtplatz neben Am Sande und dem Markt'
+    },
+    {
+      id: 'michaeliskirche', name: 'St. Michaeliskirche', icon: '⛪',
+      lat: 53.2510, lng: 10.3997, tol: 80,
+      hint: 'Ehemaliges Benediktinerkloster auf dem Kalkberg'
+    },
+    {
+      id: 'nikolaikirche', name: 'St. Nikolaikirche', icon: '⛪',
+      lat: 53.2490, lng: 10.4091, tol: 80,
+      hint: 'Östliche Stadtkirche der Altstadt, nahe der Ilmenau'
+    },
+  ]
+};
+
+const ALL_ITEMS = [...ITEMS.streets, ...ITEMS.places];
+const TOTAL = ALL_ITEMS.length;
+
+// ═══════════════════════════════════════════════
+//  MAP INIT
+// ═══════════════════════════════════════════════
+
+const map = L.map('map', {
+  center: [53.2498, 10.4050],
+  zoom: 16,
+  minZoom: 14,
+  maxZoom: 18,
+});
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende',
+  maxZoom: 19,
+}).addTo(map);
+
+// ═══════════════════════════════════════════════
+//  GAME STATE
+// ═══════════════════════════════════════════════
+
+let score        = 0;
+let placed       = new Set();
+let currentTab   = 'streets';
+let gameMode     = 'quiz';
+let toastTimer   = null;
+
+let placedMarkers = {};   // id -> L.Marker  (correct answer markers)
+let learnMarkers  = [];   // L.Marker[]      (learn-mode overview)
+let zoneCircles   = {};   // id -> L.Circle  (hint zones)
+
+// ═══════════════════════════════════════════════
+//  RENDER SIDEBAR
+// ═══════════════════════════════════════════════
+
+function renderLabels() {
+  const pool = document.getElementById('label-pool');
+  pool.innerHTML = '';
+
+  ITEMS[currentTab].forEach(item => {
+    const done = placed.has(item.id);
+    const type = currentTab === 'streets' ? 'street' : 'place';
+
+    const div = document.createElement('div');
+    div.className = `chip ${type}${done ? ' done' : ''}`;
+    div.draggable  = !done;
+    div.title      = item.hint;
+    div.dataset.id  = item.id;
+    div.dataset.tab = currentTab;
+    div.innerHTML = `
+      <span class="chip-icon">${item.icon}</span>
+      <span class="chip-name">${item.name}</span>
+      ${done ? '<span class="chip-ok">✓</span>' : ''}
+    `;
+
+    if (!done) {
+      div.addEventListener('dragstart', onDragStart);
+      div.addEventListener('dragend',   onDragEnd);
+    }
+
+    pool.appendChild(div);
+  });
+}
+
+function updateHeader() {
+  document.getElementById('score').textContent        = score;
+  document.getElementById('progress-text').textContent =
+    `${placed.size} / ${TOTAL} platziert`;
+}
+
+// ═══════════════════════════════════════════════
+//  TAB SWITCHING
+// ═══════════════════════════════════════════════
+
+function switchTab(tab) {
+  currentTab = tab;
+  const sStreets = document.getElementById('stab-streets');
+  const sPlaces  = document.getElementById('stab-places');
+  sStreets.className = 'stab' + (tab === 'streets' ? ' active-street' : '');
+  sPlaces.className  = 'stab' + (tab === 'places'  ? ' active-place'  : '');
+  renderLabels();
+}
+
+// ═══════════════════════════════════════════════
+//  MODE SWITCHING
+// ═══════════════════════════════════════════════
+
+function setMode(mode) {
+  gameMode = mode;
+  document.getElementById('btn-quiz').classList.toggle('active', mode === 'quiz');
+  document.getElementById('btn-learn').classList.toggle('active', mode === 'learn');
+  document.getElementById('learn-badge').style.display = mode === 'learn' ? 'block' : 'none';
+
+  // Clear existing learn markers
+  learnMarkers.forEach(m => map.removeLayer(m));
+  learnMarkers = [];
+
+  if (mode === 'learn') {
+    ALL_ITEMS.forEach(item => {
+      if (placed.has(item.id)) return;
+      const type = ITEMS.streets.find(i => i.id === item.id) ? 'street' : 'place';
+      const icon = L.divIcon({
+        html: `<div class="map-lbl learn">${item.icon} ${item.name}</div>`,
+        className: '',
+        iconAnchor: [-4, 10],
+      });
+      learnMarkers.push(L.marker([item.lat, item.lng], { icon, interactive: false }).addTo(map));
+    });
+    toast('📚 Lernmodus: alle Orte sichtbar', 'info');
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  DRAG & DROP
+// ═══════════════════════════════════════════════
+
+let dragItemId  = null;
+let dragItemTab = null;
+
+function onDragStart(e) {
+  dragItemId  = e.currentTarget.dataset.id;
+  dragItemTab = e.currentTarget.dataset.tab;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', dragItemId);
+  e.currentTarget.classList.add('dragging');
+  document.getElementById('map-wrap').classList.add('dragging-over');
+}
+
+function onDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.getElementById('map-wrap').classList.remove('dragging-over');
+}
+
+const mapEl   = document.getElementById('map');
+const mapWrap = document.getElementById('map-wrap');
+
+mapEl.addEventListener('dragover', e => {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+});
+
+mapEl.addEventListener('dragleave', () => {
+  mapWrap.classList.remove('dragging-over');
+});
+
+mapEl.addEventListener('drop', e => {
+  e.preventDefault();
+  mapWrap.classList.remove('dragging-over');
+
+  const id  = e.dataTransfer.getData('text/plain') || dragItemId;
+  const tab = dragItemTab;
+  if (!id) return;
+
+  const item = ALL_ITEMS.find(i => i.id === id);
+  if (!item || placed.has(item.id)) return;
+
+  const rect      = mapEl.getBoundingClientRect();
+  const pt        = map.containerPointToLatLng([e.clientX - rect.left, e.clientY - rect.top]);
+  const correct   = L.latLng(item.lat, item.lng);
+  const dist      = pt.distanceTo(correct);
+
+  if (dist <= item.tol) {
+    placeItem(item, tab || (ITEMS.streets.find(i => i.id === id) ? 'streets' : 'places'));
+  } else {
+    const distStr = dist > 500
+      ? `${(dist / 1000).toFixed(1)} km entfernt`
+      : `${Math.round(dist)} m entfernt`;
+    toast(`❌ Knapp daneben – ${distStr}!`, 'error');
+  }
+
+  dragItemId  = null;
+  dragItemTab = null;
+});
+
+// ═══════════════════════════════════════════════
+//  PLACE ITEM (correct answer)
+// ═══════════════════════════════════════════════
+
+function placeItem(item, tab) {
+  placed.add(item.id);
+  score += 10;
+
+  // Remove learn-mode marker for this item if present
+  learnMarkers = learnMarkers.filter(m => {
+    if (m._lbl_id === item.id) { map.removeLayer(m); return false; }
+    return true;
+  });
+
+  // Remove zone circle if shown
+  if (zoneCircles[item.id]) {
+    map.removeLayer(zoneCircles[item.id]);
+    delete zoneCircles[item.id];
+  }
+
+  // Place label on map
+  const type   = tab === 'streets' ? 'street' : 'place';
+  const mapIcon = L.divIcon({
+    html: `<div class="map-lbl ${type}">${item.icon} ${item.name}</div>`,
+    className: '',
+    iconAnchor: [-4, 10],
+  });
+  placedMarkers[item.id] = L.marker([item.lat, item.lng], { icon: mapIcon, interactive: false }).addTo(map);
+
+  toast(`✅ Richtig! +10 Punkte`, 'success');
+  updateHeader();
+  renderLabels();
+
+  if (placed.size === TOTAL) setTimeout(showWin, 900);
+}
+
+// ═══════════════════════════════════════════════
+//  HINT ZONES
+// ═══════════════════════════════════════════════
+
+function showZones() {
+  Object.values(zoneCircles).forEach(c => map.removeLayer(c));
+  zoneCircles = {};
+
+  ALL_ITEMS.forEach(item => {
+    if (placed.has(item.id)) return;
+    const circle = L.circle([item.lat, item.lng], {
+      radius: item.tol,
+      color: '#f0a500',
+      fillColor: '#f0a500',
+      fillOpacity: 0.1,
+      weight: 2,
+      dashArray: '6, 4',
+      interactive: false,
+    }).addTo(map);
+    zoneCircles[item.id] = circle;
+  });
+
+  toast('💡 Zielzonen für 8 Sekunden sichtbar', 'info');
+
+  setTimeout(() => {
+    Object.values(zoneCircles).forEach(c => map.removeLayer(c));
+    zoneCircles = {};
+  }, 8000);
+}
+
+// ═══════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════
+
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = `toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+// ═══════════════════════════════════════════════
+//  WIN SCREEN
+// ═══════════════════════════════════════════════
+
+function showWin() {
+  document.getElementById('win-pts').textContent = `${score} Punkte`;
+  document.getElementById('win-overlay').classList.add('show');
+}
+
+// ═══════════════════════════════════════════════
+//  RESET
+// ═══════════════════════════════════════════════
+
+function resetGame() {
+  score = 0;
+  placed.clear();
+
+  Object.values(placedMarkers).forEach(m => map.removeLayer(m));
+  placedMarkers = {};
+
+  learnMarkers.forEach(m => map.removeLayer(m));
+  learnMarkers = [];
+
+  Object.values(zoneCircles).forEach(c => map.removeLayer(c));
+  zoneCircles = {};
+
+  document.getElementById('win-overlay').classList.remove('show');
+
+  gameMode = 'quiz';
+  document.getElementById('btn-quiz').classList.add('active');
+  document.getElementById('btn-learn').classList.remove('active');
+  document.getElementById('learn-badge').style.display = 'none';
+
+  currentTab = 'streets';
+  switchTab('streets');
+  updateHeader();
+}
+
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
+
+renderLabels();
+updateHeader();
+</script>
+</body>
+</html>
