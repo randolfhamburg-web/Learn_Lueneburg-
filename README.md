@@ -1,5 +1,11 @@
 # Lüneburg lernen
 
+## App direkt aufrufen (GitHub Pages)
+
+**https://randolfhamburg-web.github.io/Learn_Lueneburg-/**
+
+> Funktioniert sobald GitHub Pages im Repository unter Settings → Pages aktiviert ist.
+
 Interaktives Quiz zum Lernen von Straßennamen und bekannten Orten in der Lüneburger Altstadt.
 
 ## Spielprinzip
