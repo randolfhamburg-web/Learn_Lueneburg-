@@ -287,6 +287,32 @@
     }
 
     /* ── WIN OVERLAY ─────────────────────────────── */
+    /* ── KALIBRIERUNG ────────────────────────────── */
+    .calib-panel {
+      position: absolute;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(13,17,23,0.96);
+      border: 2px solid #f0a500;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 0.78rem;
+      color: #e6edf3;
+      z-index: 2000;
+      display: none;
+      text-align: center;
+      min-width: 260px;
+      pointer-events: none;
+    }
+    .calib-panel.show { display: block; }
+    .calib-panel b { color: #f0a500; }
+    .calib-panel code { font-size: 0.72rem; color: #aaa; display: block; margin-top: 4px; }
+
+    body.calib-active .sidebar { pointer-events: none; opacity: 0.4; }
+    body.calib-active #btn-quiz,
+    body.calib-active #btn-learn { pointer-events: none; opacity: 0.4; }
+
     .win-overlay {
       position: absolute;
       inset: 0;
@@ -351,6 +377,7 @@
       </div>
       <button class="btn gold"   onclick="showZones()">💡 Zielzonen anzeigen (8 s)</button>
       <button class="btn danger" onclick="resetGame()">↺ Neu starten</button>
+      <button class="btn" id="btn-calib" onclick="toggleCalib()" style="border-color:#888;color:#888;font-size:0.72rem;">🎯 Kalibrieren</button>
     </div>
   </div>
 
@@ -359,6 +386,12 @@
     <div id="map"></div>
     <div class="learn-badge" id="learn-badge">📚 Lernmodus – alle Orte sichtbar</div>
     <div class="toast"       id="toast"></div>
+    <div class="calib-panel" id="calib-panel">
+      <b>🎯 Kalibrierungsmodus</b><br>
+      Marker auf die richtige Stelle ziehen.<br>
+      <span id="calib-info">Klicke einen Marker an…</span>
+      <code id="calib-coords"></code>
+    </div>
 
     <!-- Win overlay -->
     <div class="win-overlay" id="win-overlay">
@@ -770,9 +803,103 @@ function resetGame() {
 }
 
 // ═══════════════════════════════════════════════
+//  KALIBRIERUNG
+// ═══════════════════════════════════════════════
+
+let calibMode    = false;
+let calibMarkers = {}; // id -> L.Marker (draggable)
+
+function toggleCalib() {
+  calibMode ? exitCalib() : enterCalib();
+}
+
+function enterCalib() {
+  calibMode = true;
+  document.body.classList.add('calib-active');
+  document.getElementById('btn-calib').textContent  = '✅ Kalibrierung beenden';
+  document.getElementById('btn-calib').style.color  = '#3fb950';
+  document.getElementById('btn-calib').style.borderColor = '#3fb950';
+  document.getElementById('calib-panel').classList.add('show');
+
+  // Load saved calibration from localStorage first
+  loadCalib();
+
+  ALL_ITEMS.forEach(item => {
+    const marker = L.marker([item.lat, item.lng], {
+      draggable: true,
+      title: item.name,
+      zIndexOffset: 2000,
+    }).addTo(map);
+
+    const type = ITEMS.streets.find(i => i.id === item.id) ? 'street' : 'place';
+    const icon = L.divIcon({
+      html: `<div style="background:rgba(240,165,0,0.9);border:2px solid #fff;border-radius:5px;padding:2px 7px;font-size:0.72rem;font-weight:700;color:#000;white-space:nowrap;">${item.icon} ${item.name}</div>`,
+      className: '',
+      iconAnchor: [-4, 10],
+    });
+    marker.setIcon(icon);
+
+    marker.on('drag', () => {
+      const ll = marker.getLatLng();
+      document.getElementById('calib-info').textContent = item.name;
+      document.getElementById('calib-coords').textContent =
+        `lat: ${ll.lat.toFixed(6)}, lng: ${ll.lng.toFixed(6)}`;
+    });
+
+    marker.on('dragend', () => {
+      const ll = marker.getLatLng();
+      item.lat = ll.lat;
+      item.lng = ll.lng;
+      saveCalib();
+      toast(`📍 ${item.name} gespeichert`, 'info');
+    });
+
+    calibMarkers[item.id] = marker;
+  });
+
+  toast('🎯 Kalibrierung: Marker auf richtige Stelle ziehen!', 'info');
+}
+
+function exitCalib() {
+  calibMode = false;
+  document.body.classList.remove('calib-active');
+  document.getElementById('btn-calib').textContent      = '🎯 Kalibrieren';
+  document.getElementById('btn-calib').style.color      = '#888';
+  document.getElementById('btn-calib').style.borderColor = '#888';
+  document.getElementById('calib-panel').classList.remove('show');
+
+  Object.values(calibMarkers).forEach(m => map.removeLayer(m));
+  calibMarkers = {};
+
+  // Log current coordinates to browser console for reference
+  const out = ALL_ITEMS.map(i =>
+    `{ id:'${i.id}', lat:${i.lat.toFixed(6)}, lng:${i.lng.toFixed(6)} }`
+  ).join('\n');
+  console.log('=== Kalibrierte Koordinaten ===\n' + out);
+
+  toast('✅ Kalibrierung gespeichert – Spiel läuft mit neuen Koordinaten', 'success');
+}
+
+function saveCalib() {
+  const data = {};
+  ALL_ITEMS.forEach(i => { data[i.id] = { lat: i.lat, lng: i.lng }; });
+  localStorage.setItem('lueneburg-calib', JSON.stringify(data));
+}
+
+function loadCalib() {
+  try {
+    const data = JSON.parse(localStorage.getItem('lueneburg-calib') || '{}');
+    ALL_ITEMS.forEach(i => {
+      if (data[i.id]) { i.lat = data[i.id].lat; i.lng = data[i.id].lng; }
+    });
+  } catch(e) { /* ignore */ }
+}
+
+// ═══════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════
 
+loadCalib(); // Apply saved calibration on startup
 renderLabels();
 updateHeader();
 </script>
