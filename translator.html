@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Telefon-Übersetzer</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:       #0d1117;
+      --card:     #161b22;
+      --border:   #30363d;
+      --text:     #e6edf3;
+      --muted:    #8b949e;
+      --gold:     #f0a500;
+      --green:    #3fb950;
+      --red:      #f85149;
+      --blue:     #58a6ff;
+      --purple:   #bc8cff;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── Layout ── */
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 12px;
+      gap: 10px;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+    }
+    .header h1 { font-size: 1.1rem; font-weight: 700; }
+    .back-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .back-btn:hover { color: var(--text); border-color: var(--muted); }
+
+    /* ── Phone Mode Banner ── */
+    .phone-banner {
+      background: linear-gradient(135deg, #1a2a1a, #1a3020);
+      border: 1px solid #2d5a2d;
+      border-radius: 12px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8rem;
+      color: var(--green);
+    }
+    .phone-banner .icon { font-size: 1.2rem; }
+
+    /* ── Language Selector ── */
+    .lang-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .lang-select {
+      flex: 1;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      appearance: none;
+      text-align: center;
+    }
+    .lang-select:focus { outline: none; border-color: var(--blue); }
+    .swap-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--gold);
+      border-radius: 10px;
+      width: 44px;
+      height: 44px;
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .swap-btn:hover { background: #1f2937; }
+    .swap-btn:active { transform: rotate(180deg); }
+
+    /* ── Text panels ── */
+    .panels {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+      overflow: hidden;
+    }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      overflow: hidden;
+      min-height: 0;
+    }
+    .panel-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-text {
+      flex: 1;
+      font-size: 1.1rem;
+      line-height: 1.5;
+      overflow-y: auto;
+      word-break: break-word;
+      color: var(--text);
+    }
+    .panel-text.empty { color: var(--muted); font-style: italic; font-size: 0.9rem; }
+    .panel.source { border-color: #2d3a4a; }
+    .panel.target { border-color: #1a3a2a; }
+
+    /* speak button inside panel */
+    .speak-mini {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--green);
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .speak-mini:hover { border-color: var(--green); }
+    .speak-mini:disabled { opacity: 0.3; cursor: default; }
+
+    /* copy button */
+    .copy-mini {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .copy-mini:hover { border-color: var(--muted); color: var(--text); }
+
+    .panel-actions { display: flex; gap: 6px; }
+
+    /* ── Status / loading ── */
+    .status-bar {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--muted);
+      min-height: 18px;
+    }
+    .status-bar.busy { color: var(--gold); }
+    .status-bar.error { color: var(--red); }
+    .status-bar.ok { color: var(--green); }
+
+    /* ── Mic Button ── */
+    .mic-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0 8px;
+    }
+    .mic-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: 3px solid var(--blue);
+      background: var(--card);
+      color: var(--blue);
+      font-size: 2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, transform 0.1s, border-color 0.15s;
+      box-shadow: 0 0 0 0 rgba(88,166,255,0.4);
+      position: relative;
+    }
+    .mic-btn:hover { background: #1a2332; }
+    .mic-btn.recording {
+      border-color: var(--red);
+      color: var(--red);
+      background: #2a1a1a;
+      animation: pulse 1.2s infinite;
+    }
+    .mic-btn.processing {
+      border-color: var(--gold);
+      color: var(--gold);
+      background: #2a2a1a;
+    }
+    .mic-btn:active { transform: scale(0.93); }
+
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(248,81,73,0.5); }
+      70%  { box-shadow: 0 0 0 16px rgba(248,81,73,0); }
+      100% { box-shadow: 0 0 0 0 rgba(248,81,73,0); }
+    }
+
+    .mic-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .mic-label.recording { color: var(--red); }
+    .mic-label.processing { color: var(--gold); }
+
+    /* ── Clear button ── */
+    .clear-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      padding: 6px 16px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .clear-btn:hover { border-color: var(--red); color: var(--red); }
+
+    /* ── No Speech API warning ── */
+    .no-api-warning {
+      background: #2a1a0a;
+      border: 1px solid #6a3a10;
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 0.85rem;
+      color: #f0a500;
+      text-align: center;
+      display: none;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>📞 Telefon-Übersetzer</h1>
+    <a class="back-btn" href="index.html">← Karte</a>
+  </div>
+
+  <!-- Phone mode hint -->
+  <div class="phone-banner">
+    <span class="icon">💡</span>
+    <span>Anruf aktiv? Lautsprecher an → App öffnen → Einsprechen → Übersetzung anhören → zurück zum Anruf</span>
+  </div>
+
+  <!-- No speech API warning (shown if not supported) -->
+  <div class="no-api-warning" id="noApiWarning">
+    Dein Browser unterstützt keine Spracheingabe. Bitte Chrome oder Edge verwenden.
+  </div>
+
+  <!-- Language row -->
+  <div class="lang-row">
+    <select class="lang-select" id="srcLang">
+      <option value="de">🇩🇪 Deutsch</option>
+      <option value="en">🇬🇧 Englisch</option>
+      <option value="tr">🇹🇷 Türkisch</option>
+      <option value="ar">🇸🇦 Arabisch</option>
+      <option value="pl">🇵🇱 Polnisch</option>
+      <option value="ru">🇷🇺 Russisch</option>
+      <option value="fr">🇫🇷 Französisch</option>
+      <option value="es">🇪🇸 Spanisch</option>
+      <option value="it">🇮🇹 Italienisch</option>
+      <option value="uk">🇺🇦 Ukrainisch</option>
+    </select>
+    <button class="swap-btn" id="swapBtn" title="Sprachen tauschen">⇄</button>
+    <select class="lang-select" id="tgtLang">
+      <option value="en">🇬🇧 Englisch</option>
+      <option value="de">🇩🇪 Deutsch</option>
+      <option value="tr">🇹🇷 Türkisch</option>
+      <option value="ar">🇸🇦 Arabisch</option>
+      <option value="pl">🇵🇱 Polnisch</option>
+      <option value="ru">🇷🇺 Russisch</option>
+      <option value="fr">🇫🇷 Französisch</option>
+      <option value="es">🇪🇸 Spanisch</option>
+      <option value="it">🇮🇹 Italienisch</option>
+      <option value="uk">🇺🇦 Ukrainisch</option>
+    </select>
+  </div>
+
+  <!-- Text panels -->
+  <div class="panels">
+    <!-- Source text -->
+    <div class="panel source">
+      <div class="panel-label">
+        <span>Gesprochener Text</span>
+        <div class="panel-actions">
+          <button class="copy-mini" id="copySrc" disabled>📋 Kopieren</button>
+        </div>
+      </div>
+      <div class="panel-text empty" id="srcText">Drücke den Mikrofon-Button und sprich …</div>
+    </div>
+
+    <!-- Translation -->
+    <div class="panel target">
+      <div class="panel-label">
+        <span>Übersetzung</span>
+        <div class="panel-actions">
+          <button class="speak-mini" id="speakBtn" disabled>🔊 Vorlesen</button>
+          <button class="copy-mini" id="copyTgt" disabled>📋 Kopieren</button>
+        </div>
+      </div>
+      <div class="panel-text empty" id="tgtText">Übersetzung erscheint hier …</div>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="status-bar" id="statusBar">Bereit</div>
+
+  <!-- Mic button -->
+  <div class="mic-area">
+    <button class="mic-btn" id="micBtn" title="Sprechen">🎤</button>
+    <span class="mic-label" id="micLabel">Tippe zum Sprechen</span>
+    <button class="clear-btn" id="clearBtn">Löschen</button>
+  </div>
+
+</div>
+
+<script>
+// ── Language config ──────────────────────────────────────────────────────────
+const LANG_BCP47 = {
+  de: 'de-DE', en: 'en-US', tr: 'tr-TR', ar: 'ar-SA',
+  pl: 'pl-PL', ru: 'ru-RU', fr: 'fr-FR', es: 'es-ES',
+  it: 'it-IT', uk: 'uk-UA'
+};
+
+// ── DOM refs ─────────────────────────────────────────────────────────────────
+const srcLangEl  = document.getElementById('srcLang');
+const tgtLangEl  = document.getElementById('tgtLang');
+const swapBtn    = document.getElementById('swapBtn');
+const micBtn     = document.getElementById('micBtn');
+const micLabel   = document.getElementById('micLabel');
+const srcTextEl  = document.getElementById('srcText');
+const tgtTextEl  = document.getElementById('tgtText');
+const statusBar  = document.getElementById('statusBar');
+const speakBtn   = document.getElementById('speakBtn');
+const copySrc    = document.getElementById('copySrc');
+const copyTgt    = document.getElementById('copyTgt');
+const clearBtn   = document.getElementById('clearBtn');
+
+// ── State ────────────────────────────────────────────────────────────────────
+let recognition   = null;
+let isRecording   = false;
+let lastTranslation = '';
+let lastSource      = '';
+
+// ── Speech Recognition setup ─────────────────────────────────────────────────
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (!SpeechRecognition) {
+  document.getElementById('noApiWarning').style.display = 'block';
+  micBtn.disabled = true;
+  setStatus('Spracheingabe nicht unterstützt', 'error');
+} else {
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+
+  recognition.onstart = () => {
+    isRecording = true;
+    micBtn.classList.add('recording');
+    micLabel.textContent = 'Aufnahme läuft … jetzt sprechen';
+    micLabel.className = 'mic-label recording';
+    setStatus('Zuhören …', 'busy');
+  };
+
+  recognition.onresult = (event) => {
+    let interim = '';
+    let final   = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const t = event.results[i][0].transcript;
+      if (event.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    const display = final || interim;
+    if (display) showSource(display, !!final);
+    if (final) {
+      stopRecording();
+      translateText(final.trim());
+    }
+  };
+
+  recognition.onerror = (e) => {
+    stopRecording();
+    if (e.error === 'no-speech') {
+      setStatus('Kein Ton erkannt – bitte nochmal versuchen', 'error');
+    } else if (e.error === 'not-allowed') {
+      setStatus('Mikrofon-Zugriff verweigert', 'error');
+    } else {
+      setStatus('Erkennungsfehler: ' + e.error, 'error');
+    }
+  };
+
+  recognition.onend = () => {
+    if (isRecording) stopRecording();
+  };
+}
+
+// ── Mic button toggle ─────────────────────────────────────────────────────────
+micBtn.addEventListener('click', () => {
+  if (!recognition) return;
+  if (isRecording) {
+    recognition.stop();
+  } else {
+    startRecording();
+  }
+});
+
+function startRecording() {
+  recognition.lang = LANG_BCP47[srcLangEl.value] || 'de-DE';
+  try {
+    recognition.start();
+  } catch (e) {
+    setStatus('Mikrofon-Fehler: ' + e.message, 'error');
+  }
+}
+
+function stopRecording() {
+  isRecording = false;
+  micBtn.classList.remove('recording');
+  micBtn.classList.remove('processing');
+  micBtn.textContent = '🎤';
+  micLabel.textContent = 'Tippe zum Sprechen';
+  micLabel.className = 'mic-label';
+}
+
+// ── Display source text ───────────────────────────────────────────────────────
+function showSource(text, isFinal) {
+  srcTextEl.textContent = text;
+  srcTextEl.classList.remove('empty');
+  lastSource = isFinal ? text : lastSource;
+  copySrc.disabled = !isFinal;
+}
+
+// ── Translation ───────────────────────────────────────────────────────────────
+async function translateText(text) {
+  const src = srcLangEl.value;
+  const tgt = tgtLangEl.value;
+
+  if (src === tgt) {
+    showTranslation(text);
+    return;
+  }
+
+  micBtn.classList.add('processing');
+  micBtn.textContent = '⏳';
+  setStatus('Übersetze …', 'busy');
+
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${src}|${tgt}`;
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    if (data.responseStatus === 200) {
+      showTranslation(data.responseData.translatedText);
+      setStatus('Übersetzung fertig', 'ok');
+      // auto-speak on success
+      speakTranslation(data.responseData.translatedText);
+    } else {
+      setStatus('Übersetzungs-Fehler: ' + (data.responseDetails || 'unbekannt'), 'error');
+    }
+  } catch (err) {
+    setStatus('Netzwerk-Fehler – bitte prüfe deine Verbindung', 'error');
+  } finally {
+    micBtn.classList.remove('processing');
+    micBtn.textContent = '🎤';
+  }
+}
+
+function showTranslation(text) {
+  lastTranslation = text;
+  tgtTextEl.textContent = text;
+  tgtTextEl.classList.remove('empty');
+  speakBtn.disabled = false;
+  copyTgt.disabled  = false;
+}
+
+// ── Text-to-Speech ────────────────────────────────────────────────────────────
+function speakTranslation(text) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const lang = LANG_BCP47[tgtLangEl.value] || 'en-US';
+  const utt  = new SpeechSynthesisUtterance(text);
+  utt.lang = lang;
+  utt.rate = 0.95;
+  window.speechSynthesis.speak(utt);
+}
+
+speakBtn.addEventListener('click', () => {
+  if (lastTranslation) speakTranslation(lastTranslation);
+});
+
+// ── Swap languages ────────────────────────────────────────────────────────────
+swapBtn.addEventListener('click', () => {
+  const tmp        = srcLangEl.value;
+  srcLangEl.value  = tgtLangEl.value;
+  tgtLangEl.value  = tmp;
+
+  // Also swap displayed texts if available
+  if (lastSource || lastTranslation) {
+    const tmpTxt        = lastSource;
+    lastSource          = lastTranslation;
+    lastTranslation     = tmpTxt;
+
+    srcTextEl.textContent = lastSource || '';
+    tgtTextEl.textContent = lastTranslation || '';
+    [srcTextEl, tgtTextEl].forEach(el => el.classList.toggle('empty', !el.textContent));
+
+    speakBtn.disabled = !lastTranslation;
+    copySrc.disabled  = !lastSource;
+    copyTgt.disabled  = !lastTranslation;
+  }
+});
+
+// ── Clear ─────────────────────────────────────────────────────────────────────
+clearBtn.addEventListener('click', () => {
+  lastSource = '';
+  lastTranslation = '';
+  srcTextEl.textContent = 'Drücke den Mikrofon-Button und sprich …';
+  tgtTextEl.textContent = 'Übersetzung erscheint hier …';
+  srcTextEl.classList.add('empty');
+  tgtTextEl.classList.add('empty');
+  speakBtn.disabled = true;
+  copySrc.disabled  = true;
+  copyTgt.disabled  = true;
+  window.speechSynthesis && window.speechSynthesis.cancel();
+  setStatus('Bereit', '');
+});
+
+// ── Copy to clipboard ─────────────────────────────────────────────────────────
+copySrc.addEventListener('click', () => copyText(lastSource,  copySrc));
+copyTgt.addEventListener('click', () => copyText(lastTranslation, copyTgt));
+
+async function copyText(text, btn) {
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    const old = btn.textContent;
+    btn.textContent = '✓ Kopiert';
+    setTimeout(() => { btn.textContent = old; }, 1500);
+  } catch { /* clipboard blocked */ }
+}
+
+// ── Status helper ─────────────────────────────────────────────────────────────
+function setStatus(msg, type) {
+  statusBar.textContent = msg;
+  statusBar.className   = 'status-bar' + (type ? ' ' + type : '');
+}
+
+// ── Persist last used languages ───────────────────────────────────────────────
+function saveLangs() {
+  localStorage.setItem('tl_src', srcLangEl.value);
+  localStorage.setItem('tl_tgt', tgtLangEl.value);
+}
+function loadLangs() {
+  const s = localStorage.getItem('tl_src');
+  const t = localStorage.getItem('tl_tgt');
+  if (s) srcLangEl.value = s;
+  if (t) tgtLangEl.value = t;
+}
+srcLangEl.addEventListener('change', saveLangs);
+tgtLangEl.addEventListener('change', saveLangs);
+loadLangs();
+</script>
+</body>
+</html>
