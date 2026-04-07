@@ -301,27 +301,27 @@
     <select class="lang-select" id="srcLang">
       <option value="de">🇩🇪 Deutsch</option>
       <option value="en">🇬🇧 Englisch</option>
-      <option value="tr">🇹🇷 Türkisch</option>
-      <option value="ar">🇸🇦 Arabisch</option>
+      <option value="th">🇹🇭 Thailändisch</option>
+      <option value="fil">🇵🇭 Filipino</option>
+      <option value="pt">🇵🇹 Portugiesisch (EU)</option>
       <option value="pl">🇵🇱 Polnisch</option>
       <option value="ru">🇷🇺 Russisch</option>
       <option value="fr">🇫🇷 Französisch</option>
       <option value="es">🇪🇸 Spanisch</option>
       <option value="it">🇮🇹 Italienisch</option>
-      <option value="uk">🇺🇦 Ukrainisch</option>
     </select>
     <button class="swap-btn" id="swapBtn" title="Sprachen tauschen">⇄</button>
     <select class="lang-select" id="tgtLang">
       <option value="en">🇬🇧 Englisch</option>
       <option value="de">🇩🇪 Deutsch</option>
-      <option value="tr">🇹🇷 Türkisch</option>
-      <option value="ar">🇸🇦 Arabisch</option>
+      <option value="th">🇹🇭 Thailändisch</option>
+      <option value="fil">🇵🇭 Filipino</option>
+      <option value="pt">🇵🇹 Portugiesisch (EU)</option>
       <option value="pl">🇵🇱 Polnisch</option>
       <option value="ru">🇷🇺 Russisch</option>
       <option value="fr">🇫🇷 Französisch</option>
       <option value="es">🇪🇸 Spanisch</option>
       <option value="it">🇮🇹 Italienisch</option>
-      <option value="uk">🇺🇦 Ukrainisch</option>
     </select>
   </div>
 
@@ -366,9 +366,14 @@
 <script>
 // ── Language config ──────────────────────────────────────────────────────────
 const LANG_BCP47 = {
-  de: 'de-DE', en: 'en-US', tr: 'tr-TR', ar: 'ar-SA',
-  pl: 'pl-PL', ru: 'ru-RU', fr: 'fr-FR', es: 'es-ES',
-  it: 'it-IT', uk: 'uk-UA'
+  de: 'de-DE', en: 'en-US', th: 'th-TH', fil: 'fil-PH',
+  pt: 'pt-PT', pl: 'pl-PL', ru: 'ru-RU', fr: 'fr-FR',
+  es: 'es-ES', it: 'it-IT'
+};
+
+// MyMemory uses different codes for some languages
+const LANG_MYMEMORY = {
+  fil: 'tl' // Filipino/Tagalog in MyMemory API
 };
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
@@ -494,7 +499,9 @@ async function translateText(text) {
   setStatus('Übersetze …', 'busy');
 
   try {
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${src}|${tgt}`;
+    const srcCode = LANG_MYMEMORY[src] || src;
+    const tgtCode = LANG_MYMEMORY[tgt] || tgt;
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${srcCode}|${tgtCode}`;
     const res  = await fetch(url);
     const data = await res.json();
 
